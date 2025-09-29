@@ -101,16 +101,16 @@ class oscillogram:
                     for i in range(self.channels)
                 ]  # Если есть хотя бы 4 нуля, то мы уверены в наличие хоты бы одного положительного и отрицательного пиков гармонического сигнала и можем вычислить новые нули(выровнять сигнал относительно оси x)
                 self.nulls = self.find_nulls()
+        self.extrems = self.find_extrems()
+        self.frequency = self.find_frequency()
         self.phase_shift = [
             [0 for j in range(self.channels)] for i in range(self.channels)
         ]  # Задаем матрицу для сдвигов фаз
         for i in range(self.channels):
             for j in range(self.channels):
                 if i < j:
-                    a = self.phase_shift[i][j]
+                    a = self.find_shift(i, j)
                     self.phase_shift[i][j], self.phase_shift[j][i] = a, a
-        self.extrems = self.find_extrems()
-        self.frequency = self.find_frequency()
 
     def find_nulls(self):  # Проверить на работоспособность
         """Метод нахождения нулей сигнала для каждого канала.
@@ -148,7 +148,6 @@ class oscillogram:
                         b = j + count
                 if j == b - 1:
                     rez_1[i].append(sum / count)
-        print(rez_1)
         return rez_1
 
     def find_extrems(self):
@@ -177,7 +176,7 @@ class oscillogram:
                     actual_max_value = (self.times[i][j], self.values[i][j])
                 elif singl * self.values[i][j] < 0:
                     singl *= -1
-                    if abs(actual_max_value[1] / max_value) >= 2 / 3:
+                    if abs(actual_max_value[1] / max_value) >= 0.95:
                         rez[-1].append(actual_max_value)
                         actual_max_value = (self.times[i][j], self.values[i][j])
                         flag = True
@@ -194,6 +193,11 @@ class oscillogram:
         return rez
 
     def find_frequency(self):
+        """Возвращает массив с частотами для каждого канала.
+
+        Returns:
+            list[float]: Массив с частотами для каждого канала.
+        """
         rez = []
         for i in range(self.channels):
             flag_nulls, flag_extrem = False, False
@@ -202,7 +206,6 @@ class oscillogram:
                     2 * abs(self.nulls[i][-1] - self.nulls[i][0])
                 )
                 flag_nulls = True
-                print(f"{freq_nulls=}")
             except Exception as e:
                 print(
                     f"Не удалось определить частоту {i+1}-того канала по нулям сигнала. {e}"
@@ -212,7 +215,6 @@ class oscillogram:
                     2 * abs(self.extrems[i][-1][0] - self.extrems[i][0][0])
                 )
                 flag_extrem = True
-                print(f"{flag_extrem=}")
             except Exception as e:
                 print(
                     f"Не удалось опеределить частоту {i+1}-того канала по экстремумам. {e}"
@@ -230,33 +232,120 @@ class oscillogram:
                 rez.append(0)
         return rez
 
+    def find_shift(self, number_chenel_1, number_chenel_2):
+        shift_extrems = 0
+        shift_nulls = 0
+        flag_extrems = False
+        flag_nulls = False
+        try:
+            for i, value_1 in enumerate(self.extrems[number_chenel_1]):
+                for j, value_2 in enumerate(self.extrems[number_chenel_2]):
+                    if value_1[1] * value_2[1] > 0:
+                        shift_actual = abs(
+                            abs(
+                                self.extrems[number_chenel_1][i][0]
+                                - self.extrems[number_chenel_2][j][0]
+                            )
+                            - abs(i - j) / self.frequency[number_chenel_1] / 2
+                        )
+                    else:
+                        shift_actual = abs(
+                            abs(
+                                self.extrems[number_chenel_1][i][0]
+                                - self.extrems[number_chenel_2][j][0]
+                            )
+                            - (abs(i - j) / 2) / self.frequency[number_chenel_1]
+                        )
+                    shift_extrems += (
+                        shift_actual
+                        if 1 / self.frequency[number_chenel_1] / 4 > shift_actual
+                        else 1 / self.frequency[number_chenel_1] / 2 - shift_actual
+                    )
+            shift_extrems /= len(self.extrems[number_chenel_1]) * len(
+                self.extrems[number_chenel_2]
+            )
+            flag_extrems = True
+        except Exception as e:
+            print(
+                f"Не удалось найти сдвиг фазы по экстремумам. Для каналов {number_chenel_1 + 1}, {number_chenel_2 + 1}. {e}"
+            )
+        try:
+            for i, value_1 in enumerate(self.nulls[number_chenel_1]):
+                for j, value_2 in enumerate(self.nulls[number_chenel_2]):
+
+                    shift_actual = abs(
+                        abs(
+                            self.nulls[number_chenel_1][i]
+                            - self.nulls[number_chenel_2][j]
+                        )
+                        - (abs(i - j)) / self.frequency[number_chenel_1] / 2
+                    )
+                    shift_nulls += (
+                        shift_actual
+                        if 1 / self.frequency[number_chenel_1] / 4 > shift_actual
+                        else 1 / self.frequency[number_chenel_1] / 2 - shift_actual
+                    )
+            shift_nulls /= len(self.nulls[number_chenel_1]) * len(
+                self.nulls[number_chenel_2]
+            )
+            flag_nulls = True
+
+        except Exception as e:
+            print(
+                f"Не удалось найти сдвиг фазы по нулям. Для каналов {number_chenel_1 + 1}, {number_chenel_2 + 1}. {e}"
+            )
+        if flag_extrems and flag_nulls:
+            shift = (shift_nulls + shift_extrems) / 2
+            print(
+                f"Разность фаз между каналами {number_chenel_1 + 1} и {number_chenel_2 + 1} была вычеслена как среднее между разностью полученой из экстремумов и нулей. Значение полученое по нулям: {shift_nulls}, значение полученое по экстремумам: {shift_extrems}"
+            )
+        elif flag_extrems:
+            shift = shift_extrems
+        elif flag_nulls:
+            shift = shift_nulls
+        else:
+            print(
+                f"При вычислении разности фаз между каналами {number_chenel_1 + 1} и {number_chenel_2 + 1}, что-то пошло не так, был возвращен 0."
+            )
+            shift = 0
+        return shift
+
     def __str__(self):
         frequency_line = ""
         init_line = ""
         amplitudes_line = ""
         extrems_count_line = ""
         nulls_count_line = ""
+        phase_shift_line = ""
         for i in range(self.channels):
-            frequency_line += f"канал {i + 1}: {self.frequency[i] if hasattr(self.frequency, '__iter__') else self.frequency}Гц{',\t'if i !=  self.channels - 1 else ''}"
-            init_line += f"{len(self.values[i])}{','if i !=  self.channels - 1 else ''}"
+            frequency_line += f"канал {i + 1}: {(self.frequency[i] if hasattr(self.frequency, '__iter__') else self.frequency):.4e}Гц{',\t'if i !=  self.channels - 1 else ''}"
+            init_line += (
+                f"{len(self.values[i])}{', 'if i !=  self.channels - 1 else ''}"
+            )
             amplitudes_line += f"канал {i + 1}: {self.amplitude[i]:.4e}{',\t'if i !=  self.channels - 1 else ''}"
             extrems_count_line += f"канал {i + 1}: {len(self.extrems[i])}{',\t'if i !=  self.channels - 1 else ''}"
             nulls_count_line += f"канал {i + 1}: {len(self.nulls[i])}{',\t'if i !=  self.channels - 1 else ''}"
+            for j in range(i + 1):
+                if i != j:
+                    phase_shift_line += (
+                        f"каналы {j + 1}, {i + 1}: {self.phase_shift[i][j]:.4e}"
+                    )
         return f"""
-    Это экземпляр класса '{self.__class__.__name__}', с именем '{self.name}'.
+    Это экземпляр класса '{self.__class__.__name__}', с именем '{self.name}{',\t'if j !=  self.channels - 1 else ''}'.
     Путь до файла: '{self.path}'
     Осцилограмма имеет {self.channels} {'канал' if self.channels == 1 else 'канала'}, в которых по {init_line} значений x(времени) и y(измеряймой величины).
     Частота сигнала: {frequency_line}
     Амплитуда сигнала: {amplitudes_line}
     Число обнаруженых экстремумов сигнала: {extrems_count_line}
     Число обнаруженых нулей сигнала: {nulls_count_line}
+    Рзность фаз каналов: {phase_shift_line}
                """
 
 
 if __name__ == "__main__":
     print(
         oscillogram(
-            path="C:/Users/Феодор/Documents/Конспекты/Теоретические основы электро и радиотехники/Лабы/Реакция простых цепей на гармоническое и импульсное воздействие/Логи/CR 0,1/600.txt",
+            path="C:/Users/Феодор/Documents/Конспекты/Теоретические основы электро и радиотехники/Лабы/Реакция простых цепей на гармоническое и импульсное воздействие/Логи/CR 0,1/1500.txt",
             name="Тест",
         )
     )
