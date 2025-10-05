@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import re
-import os
+import random
 
 
 class oscillogram:
@@ -38,7 +38,7 @@ class oscillogram:
         name: str = None,
     ):
         self.path = path  # Инициализируетм путь до файла
-        self.frequency = frequency if frequency else 0  # Инициализируем частоту
+        # self.frequency = frequency if frequency else 0  # Инициализируем частоту
         self.name = name if name else path  # Инициализируем имя
 
         # Начало чтения файла
@@ -102,7 +102,16 @@ class oscillogram:
                 ]  # Если есть хотя бы 4 нуля, то мы уверены в наличие хоты бы одного положительного и отрицательного пиков гармонического сигнала и можем вычислить новые нули(выровнять сигнал относительно оси x)
                 self.nulls = self.find_nulls()
         self.extrems = self.find_extrems()
-        self.frequency = self.find_frequency()
+        if frequency == None:
+            self.frequency = self.find_frequency()
+        elif hasattr(frequency, "__iter__") and len(frequency) == self.channels:
+            self.frequency = frequency
+        elif not (hasattr(frequency, "__iter__")):
+            self.frequency = [frequency for i in range(self.channels)]
+        else:
+            self.frequency = [0 for i in range(self.channels)]
+            print("Что-то пошло не так при передаче частот каналов!")
+
         self.phase_shift = [
             [0 for j in range(self.channels)] for i in range(self.channels)
         ]  # Задаем матрицу для сдвигов фаз
@@ -125,7 +134,7 @@ class oscillogram:
         rez = [[] for i in range(self.channels)]
         rez_1 = [[] for i in range(self.channels)]
         for i in range(self.channels):
-            for j in range(0, len(self.values[i]) - 1):
+            for j in range(len(self.values[i]) - 1):
                 value = self.values[i][j]
                 if (
                     value > self.new_amp_nulls[i]
@@ -139,16 +148,19 @@ class oscillogram:
             for j in range(len(rez[i]) - 1):
                 if abs(rez[i][j + 1] - rez[i][j]) > max_distance:
                     max_distance = abs(rez[i][j + 1] - rez[i][j])
-            for j in range(len(rez[i]) - 1):
-                sum = 0
+            j = 0
+            while j < len(rez[i]):
+                interim_nulls = []
+                k = j + 1
                 count = 0
-                for k in range(j, len(rez[i]) - 1):
-                    if abs(rez[i][j] - rez[i][k]) < max_distance / 2:
-                        sum += rez[i][k]
-                        count += 1
-                        b = j + count
-                if j == b - 1:
-                    rez_1[i].append(sum / count)
+                while k < len(rez[i]) and abs(rez[i][j] - rez[i][k]) < max_distance / 4:
+                    interim_nulls.append(rez[i][k])
+                    k += 1
+                try:
+                    rez_1[i].append(sum(interim_nulls) / len(interim_nulls))
+                except:
+                    rez_1[i].append(rez[i][j])
+                j = k
         return rez_1
 
     def find_extrems(self):
@@ -159,22 +171,39 @@ class oscillogram:
         """
         rez = []
         for i in range(self.channels):
-            max_value = max(abs(max(self.values[i])), abs(min(self.values[i])))
             rez.append([])
-            singl = 1 if self.values[i][0] > 0 else -1
-            actual_max_value = (self.times[i][0], self.values[i][0])
-            count = 0
-            for j in range(len(self.values[i])):
-                flag = False
-                if singl * self.values[i][j] >= 0 and abs(self.values[i][j]) > abs(
-                    actual_max_value[1]
-                ):
-                    actual_max_value = (self.times[i][j], self.values[i][j])
-                elif singl * self.values[i][j] < 0:
-                    singl *= -1
-                    if abs(actual_max_value[1] / max_value) >= 0.95:
-                        rez[-1].append(actual_max_value)
+            flag = False
+            max_value = max(abs(max(self.values[i])), abs(min(self.values[i])))
+            if len(self.nulls[i]) >= 2:
+                singl = 1 if self.values[i][0] > 0 else -1
+                actual_max_value = (self.times[i][0], self.values[i][0])
+                for j in range(len(self.values[i])):
+                    if singl * self.values[i][j] >= 0 and abs(self.values[i][j]) > abs(
+                        actual_max_value[1]
+                    ):
                         actual_max_value = (self.times[i][j], self.values[i][j])
+                    elif singl * self.values[i][j] < 0:
+                        singl *= -1
+                        if (
+                            flag
+                            and abs(
+                                (actual_max_value[1] - self.new_amp_nulls[i])
+                                / (max_value - abs(self.new_amp_nulls[i]))
+                            )
+                            >= 0.8
+                        ):
+                            rez[i].append(actual_max_value)
+                        actual_max_value = (self.times[i][j], self.values[i][j])
+                        flag = True
+            if len(self.nulls[i]) < 2:
+                if abs(max(self.values[i])) > abs(min(self.values[i])):
+                    rez[i].append(
+                        (self.times[i][self.values[i].index(max_value)], max_value)
+                    )
+                else:
+                    rez[i].append(
+                        (self.times[i][self.values[i].index(-max_value)], -max_value)
+                    )
         return rez
 
     def find_amplitude(self):
@@ -222,7 +251,7 @@ class oscillogram:
                 print(
                     f"Не удалось опеределить частоту {i+1}-того канала по экстремумам. {e}"
                 )
-            if flag_nulls and flag_extrem:
+            if flag_nulls and flag_extrem and 0.8 < flag_nulls / flag_extrem < 1.2:
                 rez.append((freq_nulls + freq_extrem) / 2)
                 print(
                     f"Частота {i}-того канала найдена как среднее между частотой найденой по экстремумам и по нулям сигнала."
@@ -249,6 +278,7 @@ class oscillogram:
         shift_nulls = 0
         flag_extrems = False
         flag_nulls = False
+        c = 1
         try:
             for i, value_1 in enumerate(self.extrems[number_chenel_1]):
                 for j, value_2 in enumerate(self.extrems[number_chenel_2]):
@@ -335,18 +365,34 @@ class oscillogram:
 
     def ploter(self):
         """Выводи осцилограму со всеми каналами, сдвигами фаз, амплитудами, экстремумами и смещениями сигнала."""
+        shifts_collor = tuple(
+            tuple(
+                tuple(random.uniform(0.2, 0.5) for k in range(3))
+                for j in range(self.channels - i)
+            )
+            for i in range(self.channels)
+        )
         plt.title(self.name)
         for i in range(self.channels):
-            plt.plot()
-            plt.plot(self.times[i], self.values[i], label=f"канал {i + 1}")
+            color = tuple(random.uniform(0.4, 0.7) for i in range(3))
+            plt.scatter(self.times[i], self.values[i], s=2, color=color)
+            plt.plot(
+                self.times[i],
+                self.values[i],
+                lw=1,
+                color=color,
+                label=f"""Канал {i + 1}:
+Частота: {self.frequency[i]:.2e}
+Амплитуда: {self.amplitude[i]:.2e}""",
+            )
             plt.plot(
                 (self.times[i][0], self.times[i][-1]),
                 (self.new_amp_nulls, self.new_amp_nulls),
                 ls="--",
                 lw=0.5,
             )
-            for j in range(i + 1):
-                if i != j:
+            for j in range(self.channels):
+                if i != j and j < i and len(self.nulls[i]) > 0:
                     plt.plot(
                         (
                             self.nulls[i][int(len(self.nulls[i]) / 2)],
@@ -354,17 +400,33 @@ class oscillogram:
                             + self.phase_shift[i][j],
                         ),
                         (self.new_amp_nulls[i], self.new_amp_nulls[i]),
+                        color=shifts_collor[i][j],
+                        label=f"Сдвиг фаз к.{i + 1}, к.{j + 1}: {self.phase_shift[i][j]:.2e}",
                     )
-            extrem_x, extrem_y = zip(*self.extrems[i])
-            plt.scatter(extrem_x, extrem_y)
+                elif i != j and len(self.nulls[i]) > 0:
+                    plt.plot(
+                        [],
+                        [],
+                        color=shifts_collor[j][i],
+                        label=f"Сдвиг фаз к.{i + 1}, к.{j + 1}: {self.phase_shift[i][j]:.2e}",
+                    )
+            try:
+                extrem_x, extrem_y = zip(*self.extrems[i])
+                plt.scatter(extrem_x, extrem_y)
+            except:
+                pass
             plt.plot(
                 (self.times[i][0], self.times[i][-1]),
-                (self.amplitude[i], self.amplitude[i]),
+                (
+                    self.amplitude[i] + self.new_amp_nulls[i],
+                    self.amplitude[i] + self.new_amp_nulls[i],
+                ),
                 ls="--",
                 lw=0.5,
             )
         plt.grid()
-        plt.legend(loc="lower center", bbox_to_anchor=(0.5, -0.4), ncol=self.channels)
+        plt.legend(bbox_to_anchor=(0.5, -0.3), loc="lower center", ncol=self.channels)
+        plt.tight_layout()
         plt.show()
 
     def __str__(self):
@@ -401,7 +463,7 @@ class oscillogram:
 
 if __name__ == "__main__":
     a = oscillogram(
-        path="C:/Users/Феодор/Documents/Конспекты/Теоретические основы электро и радиотехники/Лабы/Реакция простых цепей на гармоническое и импульсное воздействие/Логи/CR 0,1/1500.txt",
+        path="C:/Users/Феодор/Documents/Конспекты/Теоретические основы электро и радиотехники/Лабы/Реакция простых цепей на гармоническое и импульсное воздействие/Логи/CR/200.txt",
         name="Тест",
     )
     print(a)
