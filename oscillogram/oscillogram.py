@@ -112,6 +112,7 @@ class oscillogram:
             self.frequency = [0 for i in range(self.channels)]
             print("Что-то пошло не так при передаче частот каналов!")
 
+        self.simplify_sig = [self.find_simplify_sig(i) for i in range(self.channels)]
         self.phase_shift = [
             [0 for j in range(self.channels)] for i in range(self.channels)
         ]  # Задаем матрицу для сдвигов фаз
@@ -264,104 +265,60 @@ class oscillogram:
                 rez.append(0)
         return rez
 
-    def find_shift(self, number_chenel_1, number_chenel_2):
-        """Возвращает разнсоть фаз двух сиганлов из каналов number_chenel_1 и number_chenel_2.
-
-        Args:
-            number_chenel_1 (int): номер первого канала от 0
-            number_chenel_2 (_type_): номер второго канала от 0
+    def find_simplify_sig(self, number_chenel):
+        """Возвращает массив с коэффициентами k и b прямых, проходящих через соседние экстремумы
 
         Returns:
-            float: разнсоть фаз двух сигналов.
+            list[lsit[k: float, b: float]]: Массив с коэффициентами для каждого канала.
         """
-        shift_extrems = 0
-        shift_nulls = 0
-        flag_extrems = False
-        flag_nulls = False
-        c = 1
-        try:
-            for i, value_1 in enumerate(self.extrems[number_chenel_1]):
-                for j, value_2 in enumerate(self.extrems[number_chenel_2]):
-                    if value_1[1] * value_2[1] > 0:
-                        shift_actual = abs(
-                            abs(
-                                self.extrems[number_chenel_1][i][0]
-                                - self.extrems[number_chenel_2][j][0]
-                            )
-                            - abs(i - j) / self.frequency[number_chenel_1] / 2
-                        )
-                    else:
-                        shift_actual = abs(
-                            abs(
-                                self.extrems[number_chenel_1][i][0]
-                                - self.extrems[number_chenel_2][j][0]
-                            )
-                            - (abs(i - j) / 2) / self.frequency[number_chenel_1]
-                        )
-                    shift_extrems += (
-                        shift_actual
-                        if 1 / self.frequency[number_chenel_1] / 4 > shift_actual
-                        else 1 / self.frequency[number_chenel_1] / 2 - shift_actual
-                    )
-                    c = (
-                        1
-                        if 1 / self.frequency[number_chenel_1] / 4 < shift_actual
-                        and i == j == 0
-                        else -1
-                    )
-            shift_extrems /= len(self.extrems[number_chenel_1]) * len(
-                self.extrems[number_chenel_2]
+        rez = []
+        for i in range(len(self.extrems[number_chenel]) - 1):
+            k = (
+                self.extrems[number_chenel][i + 1][1]
+                - self.extrems[number_chenel][i][1]
+            ) / (
+                self.extrems[number_chenel][i + 1][0]
+                - self.extrems[number_chenel][i][0]
             )
-            flag_extrems = True
-        except Exception as e:
-            print(
-                f"Не удалось найти сдвиг фазы по экстремумам. Для каналов {number_chenel_1 + 1}, {number_chenel_2 + 1}. {e}"
+            b = (
+                self.extrems[number_chenel][i][1]
+                - k * self.extrems[number_chenel][i][0]
             )
-        try:
-            for i, value_1 in enumerate(self.nulls[number_chenel_1]):
-                for j, value_2 in enumerate(self.nulls[number_chenel_2]):
-                    shift_actual = abs(
-                        abs(
-                            self.nulls[number_chenel_1][i]
-                            - self.nulls[number_chenel_2][j]
-                        )
-                        - (abs(i - j)) / self.frequency[number_chenel_1] / 2
-                    )
-                    shift_nulls += (
-                        shift_actual
-                        if 1 / self.frequency[number_chenel_1] / 4 > shift_actual
-                        else 1 / self.frequency[number_chenel_1] / 2 - shift_actual
-                    )
-                    c = (
-                        1
-                        if 1 / self.frequency[number_chenel_1] / 4 < shift_actual
-                        and i == j == 0
-                        else -1
-                    )
-            shift_nulls /= len(self.nulls[number_chenel_1]) * len(
-                self.nulls[number_chenel_2]
-            )
-            flag_nulls = True
+            rez.append((k, b))
+        return rez
 
-        except Exception as e:
-            print(
-                f"Не удалось найти сдвиг фазы по нулям. Для каналов {number_chenel_1 + 1}, {number_chenel_2 + 1}. {e}"
-            )
-        if flag_extrems and flag_nulls:
-            shift = (shift_nulls + shift_extrems) / 2
-            print(
-                f"Разность фаз между каналами {number_chenel_1 + 1} и {number_chenel_2 + 1} была вычеслена как среднее между разностью полученой из экстремумов и нулей. Значение полученое по нулям: {shift_nulls}, значение полученое по экстремумам: {shift_extrems}"
-            )
-        elif flag_extrems:
-            shift = shift_extrems
-        elif flag_nulls:
-            shift = shift_nulls
-        else:
-            print(
-                f"При вычислении разности фаз между каналами {number_chenel_1 + 1} и {number_chenel_2 + 1}, что-то пошло не так, был возвращен 0."
-            )
-            shift = 0
-        return shift * c
+    def find_shift(self, number_chenel_1, number_chenel_2):
+        flag = False
+        for i in range(len(self.simplify_sig[number_chenel_1])):
+            for j in range(len(self.simplify_sig[number_chenel_2])):
+                if (
+                    self.simplify_sig[number_chenel_1][i][0]
+                    * self.simplify_sig[number_chenel_2][j][0]
+                    > 0
+                    and flag
+                    and abs(
+                        self.simplify_sig[number_chenel_1][i][1]
+                        - self.simplify_sig[number_chenel_2][j][1]
+                    )
+                    < rez
+                ):
+                    rez = abs(
+                        self.simplify_sig[number_chenel_1][i][1]
+                        / self.simplify_sig[number_chenel_1][i][0]
+                        - self.simplify_sig[number_chenel_2][j][1]
+                        / self.simplify_sig[number_chenel_2][j][0]
+                    )
+                elif self.simplify_sig[number_chenel_1][i][0] * self.simplify_sig[
+                    number_chenel_2
+                ][j][0] > 0 and not (flag):
+                    rez = abs(
+                        self.simplify_sig[number_chenel_1][i][1]
+                        / self.simplify_sig[number_chenel_1][i][0]
+                        - self.simplify_sig[number_chenel_2][j][1]
+                        / self.simplify_sig[number_chenel_2][j][0]
+                    )
+                    flag = True
+        return rez
 
     def ploter(self):
         """Выводи осцилограму со всеми каналами, сдвигами фаз, амплитудами, экстремумами и смещениями сигнала."""
