@@ -283,12 +283,14 @@ class oscillogram:
             b = (
                 self.extrems[number_chenel][i][1]
                 - k * self.extrems[number_chenel][i][0]
+                + self.new_amp_nulls[number_chenel]
             )
             rez.append((k, b))
         return rez
 
     def find_shift(self, number_chenel_1, number_chenel_2):
         flag = False
+        rez = 0
         for i in range(len(self.simplify_sig[number_chenel_1])):
             for j in range(len(self.simplify_sig[number_chenel_2])):
                 if (
@@ -298,7 +300,9 @@ class oscillogram:
                     and flag
                     and abs(
                         self.simplify_sig[number_chenel_1][i][1]
+                        / self.simplify_sig[number_chenel_1][i][0]
                         - self.simplify_sig[number_chenel_2][j][1]
+                        / self.simplify_sig[number_chenel_2][j][0]
                     )
                     < rez
                 ):
