@@ -24,7 +24,7 @@ class oscillogram:
         а nulls, amplitude и некоторые другие характеристики, пересчитываются относительно этих новых нулей. Вычесляется только в случае обнаружения хотябы 4 'обычных' нулей.
         10. amplitude(list[float]) - значения амплитуд сигналов для каждого канала, определяется во время выполнения метод find_extrems.
         взависимость от того где достигается максимальное значение может быть как положительным так и отрицательным.
-        11. extrems(list[list[float]]) - экстремальные значения сигнала.
+        11. extrems(list[list[tuple[float, float]]]) - экстремальные значения сигнала.
         . phase_shift(list[list(float)]) - матрица сдвига фаз n x n, где n - число каналов.
     Методы:
         1. find_nuls
@@ -322,6 +322,47 @@ class oscillogram:
                         / self.simplify_sig[number_chenel_2][j][0]
                     )
                     flag = True
+        if not (flag):
+            try:
+                for i in range(len(self.extrems[number_chenel_1])):
+                    for j in range(len(self.extrems[number_chenel_2])):
+                        if (
+                            (
+                                self.extrems[number_chenel_1][i][1]
+                                + self.new_amp_nulls[number_chenel_1]
+                            )
+                            * (
+                                self.extrems[number_chenel_2][j][1]
+                                + self.new_amp_nulls[number_chenel_2]
+                            )
+                            > 0
+                            and abs(
+                                self.extrems[number_chenel_1][i][0]
+                                - self.extrems[number_chenel_2][j][0]
+                            )
+                            < rez
+                            and flag
+                        ):
+                            rez = abs(
+                                self.extrems[number_chenel_1][i][0]
+                                - self.extrems[number_chenel_2][j][0]
+                            )
+                        elif (
+                            self.extrems[number_chenel_1][i][1]
+                            + self.new_amp_nulls[number_chenel_1]
+                        ) * (
+                            self.extrems[number_chenel_2][j][1]
+                            + self.new_amp_nulls[number_chenel_2]
+                        ) > 0 and not (
+                            flag
+                        ):
+                            rez = abs(
+                                self.extrems[number_chenel_1][i][0]
+                                - self.extrems[number_chenel_2][j][0]
+                            )
+                            flag = True
+            except Exception as e:
+                print(f"Что-то пошло не так, {e}")
         return rez
 
     def ploter(self):
