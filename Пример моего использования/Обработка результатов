@@ -1,0 +1,38 @@
+import math as m
+import os
+from oscillogram.oscillogram import oscillogram
+import re
+import matplotlib.pyplot as plt
+
+fr = []
+fx = []
+fch = []
+x = []
+path = "RC 1/"
+for i in os.listdir(path=path):
+    try:
+        fr.append(int(re.findall(r"(.+?)\.txt", i)[0]))
+    except:
+        fr.append(re.findall(r"(.+?)\.txt", i)[0])
+try:
+    fr.sort()
+except:
+    pass
+for i in fr:
+    try:
+        a = oscillogram(path=f"{path}{str(i)}.txt")
+    except ZeroDivisionError:
+        a = oscillogram(path=f"{path}{str(i)}.txt", frequency=[i, i])
+    print(a)
+    # a.ploter()
+    fx.append(abs(a.amplitude[1] / a.amplitude[0]))
+    fch.append(a.phase_shift[0][1])
+    x.append(sum(a.frequency) / 2)
+plt.title("АЧХ")
+plt.scatter(list(map(lambda x: x * 2 * m.pi, x)), fx)
+plt.grid()
+plt.show()
+plt.title("ФЧХ")
+plt.scatter(list(map(lambda x: x * 2 * m.pi, x)), fch)
+plt.grid()
+plt.show()
