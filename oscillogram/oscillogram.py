@@ -109,8 +109,9 @@ class oscillogram:
                 ]  # Если есть хотя бы 4 нуля, то мы уверены в наличие хоты бы одного положительного и отрицательного пиков гармонического сигнала и можем вычислить новые нули(выровнять сигнал относительно оси x)
                 self.nulls = self.find_nulls()
         self.extrems = self.find_extrems()
+        self.frequency_error = [0 for i in range(self.channels)]
         if frequency == None:
-            self.frequency = self.find_frequency()
+            self.frequency, self.frequency_error = self.find_frequency()
         elif hasattr(frequency, "__iter__") and len(frequency) == self.channels:
             self.frequency = frequency
         elif not (hasattr(frequency, "__iter__")):
@@ -248,6 +249,7 @@ class oscillogram:
             list[float]: Массив с частотами для каждого канала.
         """
         rez = []
+        frequency_error = []
         self.frequency_error = []
         for i in range(self.channels):
             flag_nulls, flag_extrem = False, False
@@ -281,7 +283,7 @@ class oscillogram:
                 )
             if flag_nulls and flag_extrem and 0.8 < flag_nulls / flag_extrem < 1.2:
                 rez.append((freq_nulls + freq_extrem) / 2)
-                self.frequency_error.append(
+                frequency_error.append(
                     (eror_freq_nulls**2 + eror_freq_extrems**2) ** 0.5
                 )
                 print(
@@ -289,13 +291,14 @@ class oscillogram:
                 )
             elif flag_nulls:
                 rez.append(freq_nulls)
-                self.frequency_error.append(eror_freq_nulls)
+                frequency_error.append(eror_freq_nulls)
             elif flag_extrem:
                 rez.append(freq_extrem)
-                self.frequency_error.append(eror_freq_extrems)
+                frequency_error.append(eror_freq_extrems)
             else:
                 rez.append(0)
-        return rez
+                frequency_error.append(0)
+        return (rez, frequency_error)
 
     def find_simplify_sig(self, number_chenel):
         """Возвращает массив с коэффициентами k и b прямых, проходящих через соседние экстремумы
