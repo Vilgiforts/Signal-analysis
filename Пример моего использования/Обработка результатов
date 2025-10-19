@@ -1,0 +1,51 @@
+import math as m
+import os
+from oscillogram.oscillogram import oscillogram
+import re
+import matplotlib.pyplot as plt
+
+fr = []
+fx = []
+fx_error = []
+fch = []
+fch_error = []
+x = []
+path = "RC 1/"
+for i in os.listdir(path=path):
+    try:
+        fr.append(int(re.findall(r"(.+?)\.txt", i)[0]))
+    except:
+        fr.append(re.findall(r"(.+?)\.txt", i)[0])
+try:
+    fr.sort()
+except:
+    pass
+for i in fr:
+    try:
+        a = oscillogram(path=f"{path}{str(i)}.txt")
+    except ZeroDivisionError:
+        a = oscillogram(path=f"{path}{str(i)}.txt", frequency=[i, i])
+    print(a)
+    fx.append(abs(a.amplitude[1] / a.amplitude[0]))
+    fx_error.append(
+        (
+            (a.amplitude_error[1] / a.amplitude[0]) ** 2
+            + ((a.amplitude[1] / a.amplitude[0] ** 2 * a.amplitude_error[0]) ** 2)
+        )
+        ** 0.5
+    )
+    fch.append(a.phase_shift[0][1])
+    fch_error.append(a.phase_shift_error[0][1])
+    x.append(sum(a.frequency) / 2)
+plt.title("АЧХ")
+plt.errorbar(
+    list(map(lambda x: x * 2 * m.pi, x)), fx, yerr=fx_error, fmt="o", ecolor="red"
+)
+plt.grid()
+plt.show()
+plt.title("ФЧХ")
+plt.errorbar(
+    list(map(lambda x: x * 2 * m.pi, x)), fch, yerr=fch_error, fmt="o", ecolor="red"
+)
+plt.grid()
+plt.show()
