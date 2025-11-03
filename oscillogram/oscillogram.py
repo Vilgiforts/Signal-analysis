@@ -40,7 +40,10 @@ class oscillogram:
         relative_erorr_y: int | float = 0.001,
     ):
         self.path = path  # Инициализируетм путь до файла
-        self.name = name if name else path  # Инициализируем имя
+        dot_index = path.find(".")
+        self.name = (
+            name if name else path[:dot_index] if dot_index != -1 else path
+        )  # Инициализируем имя
         self.relative_erorr_y = relative_erorr_y
 
         # Начало чтения файла
@@ -471,7 +474,7 @@ class oscillogram:
         ) = (delta_rez, delta_rez)
         return rez
 
-    def ploter(self):
+    def ploter(self, save: bool = False, show: bool = True):
         """Выводи осцилограму со всеми каналами, сдвигами фаз, амплитудами, экстремумами и смещениями сигнала."""
         shifts_collor = tuple(
             tuple(
@@ -521,7 +524,7 @@ class oscillogram:
             try:
                 extrem_x, extrem_y = zip(*self.extrems[i])
                 plt.scatter(extrem_x, extrem_y)
-                plt.errorbar(extrem_x, extrem_y, yerr=self.amplitude_error[i])
+                # plt.errorbar(extrem_x, extrem_y, yerr=self.amplitude_error[i])
             except:
                 pass
             plt.plot(
@@ -536,7 +539,13 @@ class oscillogram:
         plt.grid()
         plt.legend(bbox_to_anchor=(0.5, -0.3), loc="lower center", ncol=self.channels)
         plt.tight_layout()
-        plt.show()
+        if save:
+            plt.savefig(f"{self.name}.png")
+            print(f"Файл сохранен в этой дериктории с именем: {self.name}.png")
+        if show:
+            plt.show()
+        else:
+            plt.close("all")
 
     def __str__(self):
         frequency_line = ""
