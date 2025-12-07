@@ -146,6 +146,8 @@ class oscillogram:
         """
         try:
             self.new_amp_nulls
+            for k in range(self.channels):
+                self.values[k] = list(np.array(self.values[k]) - self.new_amp_nulls[k])
         except:
             self.new_amp_nulls = [0 for i in range(self.channels)]
         rez = [[] for i in range(self.channels)]
@@ -468,13 +470,22 @@ class oscillogram:
                             flag = True
             except Exception as e:
                 print(f"Что-то пошло не так, {e}")
-        (
-            self.phase_shift_error[number_chenel_1][number_chenel_2],
-            self.phase_shift_error[number_chenel_2][number_chenel_1],
-        ) = (delta_rez, delta_rez)
+        try:
+            (
+                self.phase_shift_error[number_chenel_1][number_chenel_2],
+                self.phase_shift_error[number_chenel_2][number_chenel_1],
+            ) = (delta_rez, delta_rez)
+        except Exception as e:
+            print(
+                f"При расчте погрешности что-то пшло не так! В качестве погрешности был возвращен 0. Ошибка: {e}"
+            )
+            (
+                self.phase_shift_error[number_chenel_1][number_chenel_2],
+                self.phase_shift_error[number_chenel_2][number_chenel_1],
+            ) = (0, 0)
         return rez
 
-    def ploter(self, save: bool = False, show: bool = True):
+    def ploter(self, save: bool = False, show: bool = True, info_bar: bool = True):
         """Выводи осцилограму со всеми каналами, сдвигами фаз, амплитудами, экстремумами и смещениями сигнала."""
         shifts_collor = tuple(
             tuple(
@@ -486,7 +497,12 @@ class oscillogram:
         plt.title(self.name)
         for i in range(self.channels):
             color = tuple(random.uniform(0.4, 0.7) for i in range(3))
-            plt.scatter(self.times[i], self.values[i], s=2, color=color)
+            plt.scatter(
+                self.times[i],
+                [j - self.new_amp_nulls[i] for j in self.values[i]],
+                s=2,
+                color=color,
+            )
             plt.plot(
                 self.times[i],
                 self.values[i],
@@ -537,11 +553,14 @@ class oscillogram:
                 lw=0.5,
             )
         plt.grid()
-        plt.legend(bbox_to_anchor=(0.5, -0.3), loc="lower center", ncol=self.channels)
+        if info_bar:
+            plt.legend(
+                bbox_to_anchor=(0.5, -0.3), loc="lower center", ncol=self.channels
+            )
         plt.tight_layout()
         if save:
-            plt.savefig(f"{self.name}.png")
-            print(f"Файл сохранен в этой дериктории с именем: {self.name}.png")
+            plt.savefig(f"{self.path}.png")
+            print(f"Файл сохранен в этой дериктории с именем: {self.path}.png")
         if show:
             plt.show()
         else:
