@@ -203,14 +203,7 @@ class oscillogram:
                         actual_max_value = (self.times[i][j], self.values[i][j])
                     elif singl * self.values[i][j] < 0:
                         singl *= -1
-                        if (
-                            flag
-                            and abs(
-                                (actual_max_value[1] - self.new_amp_nulls[i])
-                                / (max_value - abs(self.new_amp_nulls[i]))
-                            )
-                            >= 0.8
-                        ):
+                        if flag and abs((actual_max_value[1]) / (max_value)) >= 0.8:
                             rez[i].append(actual_max_value)
                         actual_max_value = (self.times[i][j], self.values[i][j])
                         flag = True
@@ -231,7 +224,7 @@ class oscillogram:
         for i in range(self.channels):
             try:
                 mean_valeu, eror = confidence_interval(
-                    [self.extrems[i][j][1] for j in range(len(self.extrems[i]))],
+                    [abs(self.extrems[i][j][1]) for j in range(len(self.extrems[i]))],
                     relative_error=self.relative_erorr_y,
                 )
                 print(
@@ -240,11 +233,8 @@ class oscillogram:
                 self.amplitude_error.append(eror)
                 rez.append(mean_valeu)
             except:
-                rez.append(max(abs(max(self.values[i])), abs(min(self.values[i]))))
-                self.amplitude_error.append(self.relative_erorr_y * rez[-1])
-                print(
-                    f"Амплитуда {i + 1}-го канала определена по наибольшему по модулю значению значению."
-                )
+                print(f"Не удалось определить амлитуду для {i}го канала")
+                rez.append(0, 0)
         return rez
 
     def find_frequency(self):
@@ -499,7 +489,7 @@ class oscillogram:
             color = tuple(random.uniform(0.4, 0.7) for i in range(3))
             plt.scatter(
                 self.times[i],
-                [j - self.new_amp_nulls[i] for j in self.values[i]],
+                self.values[i],
                 s=2,
                 color=color,
             )
