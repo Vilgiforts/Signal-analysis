@@ -25,4 +25,4 @@ def confidence_interval(
         )
         return rez
     else:
-        return (array[0], absolute_error + relative_error * array[0])
+        return (array[0], t_inf / 3 * (absolute_error + relative_error * array[0]))
