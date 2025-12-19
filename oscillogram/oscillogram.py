@@ -37,14 +37,23 @@ class oscillogram:
         path: str,
         frequency: float | list[int | float] | tuple[int | float] = None,
         name: str = None,
+        relative_erorr_x: int | float = 0,
         relative_erorr_y: int | float = 0.001,
+        absolute_error_x: int | float = 0,
+        absolute_error_y: int | float = 0,
+        confidence_probability: float = 0.95,
     ):
         self.path = path  # Инициализируетм путь до файла
         dot_index = path.find(".")
         self.name = (
             name if name else path[:dot_index] if dot_index != -1 else path
         )  # Инициализируем имя
+        self.relative_erorr_x = relative_erorr_x
         self.relative_erorr_y = relative_erorr_y
+        self.absolute_error_x = absolute_error_x
+        self.absolute_error_y = absolute_error_y
+        self.confidence_probability = confidence_probability
+        self.t_inf = sps.t.ppf(1 / 2 + confidence_probability / 2, df=10**6)
 
         # Начало чтения файла
         with open(path, "r") as file:  # Открываем файл
@@ -155,12 +164,8 @@ class oscillogram:
         for i in range(self.channels):
             for j in range(len(self.values[i]) - 1):
                 value = self.values[i][j]
-                if (
-                    value > self.new_amp_nulls[i]
-                    and self.values[i][j + 1] < self.new_amp_nulls[i]
-                ) or (
-                    value < self.new_amp_nulls[i]
-                    and self.values[i][j + 1] > self.new_amp_nulls[i]
+                if (value > 0 and self.values[i][j + 1] < 0) or (
+                    value < 0 and self.values[i][j + 1] > 0
                 ):
                     rez[i].append(self.times[i][j])
             max_distance = 0
@@ -203,7 +208,7 @@ class oscillogram:
                         actual_max_value = (self.times[i][j], self.values[i][j])
                     elif singl * self.values[i][j] < 0:
                         singl *= -1
-                        if flag and abs((actual_max_value[1]) / (max_value)) >= 0.8:
+                        if flag and abs((actual_max_value[1]) / (max_value)) >= 0.7:
                             rez[i].append(actual_max_value)
                         actual_max_value = (self.times[i][j], self.values[i][j])
                         flag = True
@@ -226,6 +231,8 @@ class oscillogram:
                 mean_valeu, eror = confidence_interval(
                     [abs(self.extrems[i][j][1]) for j in range(len(self.extrems[i]))],
                     relative_error=self.relative_erorr_y,
+                    absolute_error=self.absolute_error_y,
+                    confidence_probability=self.confidence_probability,
                 )
                 print(
                     f"Амплитуда {i + 1}-го канала определена по {len(self.extrems[i])} экстремумам"
@@ -234,7 +241,8 @@ class oscillogram:
                 rez.append(mean_valeu)
             except:
                 print(f"Не удалось определить амлитуду для {i}го канала")
-                rez.append(0, 0)
+                self.amplitude_error.append(0)
+                rez.append(0)
         return rez
 
     def find_frequency(self):
@@ -249,38 +257,43 @@ class oscillogram:
         for i in range(self.channels):
             flag_nulls, flag_extrem = False, False
             try:  # Определение частоты по нулям
-                freq_nulls = (len(self.nulls[i]) - 1) / (
-                    2 * abs(self.nulls[i][-1] - self.nulls[i][0])
+                period, eror_period = confidence_interval(
+                    [
+                        (2 * abs(self.nulls[i][j + 1] - self.nulls[i][j]))
+                        for j in range(len(self.nulls[i]) - 1)
+                    ],
+                    confidence_probability=self.confidence_probability,
+                    absolute_error=2 * 2**0.5 * self.delta_time[i],
                 )
+                freq_nulls = 1 / period
                 flag_nulls = True
-                eror_freq_nulls = (
-                    (len(self.nulls[i]) - 1)
-                    / ((self.nulls[i][-1] - self.nulls[i][0]) ** 2)
-                    * self.delta_time[i]
-                ) * sps.t.ppf(1 / 2 + 0.95 / 2, df=10**6)
+                eror_freq_nulls = eror_period / period**2
             except Exception as e:
                 print(
                     f"Не удалось определить частоту {i+1}-того канала по нулям сигнала. {e}"
                 )
             try:  # Определение частоты по экстремумам
-                freq_extrem = (len(self.extrems[i]) - 1) / (
-                    2 * abs(self.extrems[i][-1][0] - self.extrems[i][0][0])
+                period, eror_period = confidence_interval(
+                    [
+                        (2 * abs(self.extrems[i][j + 1][0] - self.extrems[i][j][0]))
+                        for j in range(len(self.extrems[i]) - 1)
+                    ],
+                    confidence_probability=self.confidence_probability,
+                    absolute_error=2 * 2**0.5 * self.delta_time[i],
                 )
-                eror_freq_extrems = (
-                    (len(self.nulls[i]) - 1)
-                    / ((self.extrems[i][-1][0] - self.extrems[i][0][0]) ** 2)
-                    * self.delta_time[i]
-                ) * sps.t.ppf(1 / 2 + 0.95 / 2, df=10**6)
+                freq_extrem = 1 / period
+                eror_freq_extrems = eror_period / period**2
                 flag_extrem = True
             except Exception as e:
                 print(
                     f"Не удалось опеределить частоту {i+1}-того канала по экстремумам. {e}"
                 )
-            if flag_nulls and flag_extrem and 0.8 < flag_nulls / flag_extrem < 1.2:
-                rez.append((freq_nulls + freq_extrem) / 2)
-                frequency_error.append(
-                    (eror_freq_nulls**2 + eror_freq_extrems**2) ** 0.5
+            if flag_nulls and flag_extrem:
+                freq, freq_error = uneven_measurements(
+                    (freq_nulls, freq_extrem), (eror_freq_nulls, eror_freq_extrems)
                 )
+                rez.append(freq)
+                frequency_error.append(freq_error)
                 print(
                     f"Частота {i}-того канала найдена как среднее между частотой найденой по экстремумам и по нулям сигнала."
                 )
@@ -502,12 +515,6 @@ class oscillogram:
 Частота: {self.frequency[i]:.2e}
 Амплитуда: {self.amplitude[i]:.2e}""",
             )
-            plt.plot(
-                (self.times[i][0], self.times[i][-1]),
-                (self.new_amp_nulls, self.new_amp_nulls),
-                ls="--",
-                lw=0.5,
-            )
             for j in range(self.channels):
                 if i != j and j < i and len(self.nulls[i]) > 0:
                     plt.plot(
@@ -536,8 +543,8 @@ class oscillogram:
             plt.plot(
                 (self.times[i][0], self.times[i][-1]),
                 (
-                    self.amplitude[i] + self.new_amp_nulls[i],
-                    self.amplitude[i] + self.new_amp_nulls[i],
+                    self.amplitude[i],
+                    self.amplitude[i],
                 ),
                 ls="--",
                 lw=0.5,
