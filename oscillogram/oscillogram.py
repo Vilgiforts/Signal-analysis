@@ -4,6 +4,11 @@ import matplotlib.pyplot as plt
 import re
 import random
 from .eror_funks import *
+import traceback
+import sys
+
+text_error = lambda x: f"\033[31m {x} \033[39m"
+text_info = lambda x: f"\033[34m {x} \033[39m"
 
 
 class oscillogram:
@@ -120,7 +125,7 @@ class oscillogram:
                     for i in range(self.channels)
                 ]  # Если есть хотя бы 4 нуля, то мы уверены в наличие хоты бы одного положительного и отрицательного пиков гармонического сигнала и можем вычислить новые нули(выровнять сигнал относительно оси x)
                 self.nulls = self.find_nulls()
-        self.extrems = self.find_extrems()
+        self.extrems, self.extrems_error = self.find_extrems()
         self.frequency_error = [0 for i in range(self.channels)]
         if frequency == None:
             self.frequency, self.frequency_error = self.find_frequency()
@@ -130,7 +135,7 @@ class oscillogram:
             self.frequency = [frequency for i in range(self.channels)]
         else:
             self.frequency = [0 for i in range(self.channels)]
-            print("Что-то пошло не так при передаче частот каналов!")
+            print(text_error("Что-то пошло не так при передаче частот каналов!"))
 
         simplitfy = [self.find_simplify_sig(i) for i in range(self.channels)]
         self.simplify_sig = [i[0] for i in simplitfy]
@@ -194,23 +199,27 @@ class oscillogram:
             list[list[tuple[float, float]]]: список в котором для каждого канала находятся списки кортежей с парами значений (время, значение).
         """
         rez = []
+        new_rez = []
+        error_rez = []
         for i in range(self.channels):
             rez.append([])
+            new_rez.append([])
+            error_rez.append([])
             flag = False
             max_value = max(abs(max(self.values[i])), abs(min(self.values[i])))
             if len(self.nulls[i]) >= 2:
                 singl = 1 if self.values[i][0] > 0 else -1
-                actual_max_value = (self.times[i][0], self.values[i][0])
+                actual_max_value = (0, self.values[i][0])
                 for j in range(len(self.values[i])):
                     if singl * self.values[i][j] >= 0 and abs(self.values[i][j]) > abs(
                         actual_max_value[1]
                     ):
-                        actual_max_value = (self.times[i][j], self.values[i][j])
+                        actual_max_value = (j, self.values[i][j])
                     elif singl * self.values[i][j] < 0:
                         singl *= -1
                         if flag and abs((actual_max_value[1]) / (max_value)) >= 0.7:
                             rez[i].append(actual_max_value)
-                        actual_max_value = (self.times[i][j], self.values[i][j])
+                        actual_max_value = (0, self.values[i][j])
                         flag = True
             if len(self.nulls[i]) < 2:
                 if abs(max(self.values[i])) > abs(min(self.values[i])):
@@ -221,26 +230,51 @@ class oscillogram:
                     rez[i].append(
                         (self.times[i][self.values[i].index(-max_value)], -max_value)
                     )
-        return rez
+            for j in range(len(rez[i])):
+                k = rez[i][j][0]
+                p = int(0.1 * len(self.times[i]) / len(self.nulls[i]))
+                idx = (max((k - p, 0)), min(k + p + 1, len(self.times[i]) - 1))
+
+                value, error = error_extrems(
+                    self.times[i][idx[0] : idx[1]],
+                    self.values[i][idx[0] : idx[1]],
+                )
+                new_rez[i].append(value)
+                error_rez[i].append(error)
+        return new_rez, error_rez
 
     def find_amplitude(self):
         rez = []
         self.amplitude_error = []
         for i in range(self.channels):
             try:
-                mean_valeu, eror = confidence_interval(
+                # mean_value, eror = confidence_interval(
+                #     [abs(self.extrems[i][j][1]) for j in range(len(self.extrems[i]))],
+                #     relative_error=self.relative_erorr_y,
+                #     absolute_error=self.absolute_error_y,
+                #     confidence_probability=self.confidence_probability,
+                # )
+                mean_value, error = uneven_measurements(
                     [abs(self.extrems[i][j][1]) for j in range(len(self.extrems[i]))],
-                    relative_error=self.relative_erorr_y,
-                    absolute_error=self.absolute_error_y,
-                    confidence_probability=self.confidence_probability,
+                    self.extrems_error[i],
                 )
                 print(
-                    f"Амплитуда {i + 1}-го канала определена по {len(self.extrems[i])} экстремумам"
+                    text_info(
+                        f"Амплитуда {i + 1}-го канала определена по {len(self.extrems[i])} экстремумам"
+                    )
                 )
-                self.amplitude_error.append(eror)
-                rez.append(mean_valeu)
-            except:
-                print(f"Не удалось определить амлитуду для {i}го канала")
+                self.amplitude_error.append(error)
+                rez.append(mean_value)
+            except Exception as e:
+                # exc_type, exc_value, exc_traceback = sys.exc_info()
+
+                # Форматируем traceback в строку
+                error_message = traceback.format_exc()
+                print(
+                    text_error(
+                        f"Не удалось определить амлитуду для {i}-го канала, ошибка:\n{e}\n{error_message}"
+                    )
+                )
                 self.amplitude_error.append(0)
                 rez.append(0)
         return rez
@@ -270,7 +304,9 @@ class oscillogram:
                 eror_freq_nulls = eror_period / period**2
             except Exception as e:
                 print(
-                    f"Не удалось определить частоту {i+1}-того канала по нулям сигнала. {e}"
+                    text_error(
+                        f"Не удалось определить частоту {i+1}-того канала по нулям сигнала. {e}"
+                    )
                 )
             try:  # Определение частоты по экстремумам
                 period, eror_period = confidence_interval(
@@ -286,7 +322,9 @@ class oscillogram:
                 flag_extrem = True
             except Exception as e:
                 print(
-                    f"Не удалось опеределить частоту {i+1}-того канала по экстремумам. {e}"
+                    text_error(
+                        f"Не удалось опеределить частоту {i+1}-того канала по экстремумам. {e}"
+                    )
                 )
             if flag_nulls and flag_extrem:
                 freq, freq_error = uneven_measurements(
@@ -295,7 +333,9 @@ class oscillogram:
                 rez.append(freq)
                 frequency_error.append(freq_error)
                 print(
-                    f"Частота {i}-того канала найдена как среднее между частотой найденой по экстремумам и по нулям сигнала."
+                    text_info(
+                        f"Частота {i}-того канала найдена как среднее между частотой найденой по экстремумам и по нулям сигнала."
+                    )
                 )
             elif flag_nulls:
                 rez.append(freq_nulls)
@@ -472,7 +512,7 @@ class oscillogram:
                             ) ** 0.5
                             flag = True
             except Exception as e:
-                print(f"Что-то пошло не так, {e}")
+                print(text_error(f"Что-то пошло не так в функции find_shift, {e}"))
         try:
             (
                 self.phase_shift_error[number_chenel_1][number_chenel_2],
@@ -480,7 +520,9 @@ class oscillogram:
             ) = (delta_rez, delta_rez)
         except Exception as e:
             print(
-                f"При расчте погрешности что-то пшло не так! В качестве погрешности был возвращен 0. Ошибка: {e}"
+                text_error(
+                    f"При расчте погрешности в функции find_shift что-то пшло не так! В качестве погрешности был возвращен 0. Ошибка: {e}"
+                )
             )
             (
                 self.phase_shift_error[number_chenel_1][number_chenel_2],
@@ -557,7 +599,9 @@ class oscillogram:
         plt.tight_layout()
         if save:
             plt.savefig(f"{self.path}.png")
-            print(f"Файл сохранен в этой дериктории с именем: {self.path}.png")
+            print(
+                text_info(f"Файл сохранен в этой дериктории с именем: {self.path}.png")
+            )
         if show:
             plt.show()
         else:
