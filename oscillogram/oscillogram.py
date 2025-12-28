@@ -232,7 +232,7 @@ class oscillogram:
                     )
             for j in range(len(rez[i])):
                 k = rez[i][j][0]
-                p = int(0.1 * len(self.times[i]) / len(self.nulls[i]))
+                p = int(0.15 * len(self.times[i]) / len(self.nulls[i]))
                 idx = (max((k - p, 0)), min(k + p + 1, len(self.times[i]) - 1))
 
                 value, error = error_extrems(
@@ -541,7 +541,12 @@ class oscillogram:
         )
         plt.title(self.name)
         for i in range(self.channels):
-            color = tuple(random.uniform(0.4, 0.7) for i in range(3))
+            color = [random.uniform(0.3, 0.45) for i in range(3)]
+            index_max_color = color.index(max(color))
+            color[index_max_color] = random.uniform(0.6, 0.85) * (
+                1.1 if (index_max_color in (0, 2)) else 0.85
+            )
+            revers_color = tuple((1 - i) for i in color)
             plt.scatter(
                 self.times[i],
                 self.values[i],
@@ -578,7 +583,7 @@ class oscillogram:
                     )
             try:
                 extrem_x, extrem_y = zip(*self.extrems[i])
-                plt.scatter(extrem_x, extrem_y)
+                plt.scatter(extrem_x, extrem_y, c=revers_color, zorder=10)
                 # plt.errorbar(extrem_x, extrem_y, yerr=self.amplitude_error[i])
             except:
                 pass
