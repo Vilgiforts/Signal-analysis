@@ -640,12 +640,3 @@ class oscillogram:
     Число обнаруженых нулей сигнала: {nulls_count_line}
     Рзность фаз каналов: {phase_shift_line}
                """
-
-
-if __name__ == "__main__":
-    a = oscillogram(
-        path="/home/vilgiforts/Documents/Конспекты/Теоретические основы электро и радиотехники/Лабы/Реакция простых цепей на гармоническое и импульсное воздействие/Логи/CR/200.txt",
-        name="Тест",
-    )
-    print(a)
-    a.ploter()
