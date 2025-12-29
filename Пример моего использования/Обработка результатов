@@ -1,7 +1,6 @@
 import math as m
 import os
-from oscillogram.oscillogram import oscillogram
-import re
+from oscillogram import *
 import matplotlib.pyplot as plt
 
 fr = []
@@ -10,21 +9,10 @@ fx_error = []
 fch = []
 fch_error = []
 x = []
-path = "RC 1/"
+x_error = []
+path = "Пример моего использования/RC 1"
 for i in os.listdir(path=path):
-    try:
-        fr.append(int(re.findall(r"(.+?)\.txt", i)[0]))
-    except:
-        fr.append(re.findall(r"(.+?)\.txt", i)[0])
-try:
-    fr.sort()
-except:
-    pass
-for i in fr:
-    try:
-        a = oscillogram(path=f"{path}{str(i)}.txt")
-    except ZeroDivisionError:
-        a = oscillogram(path=f"{path}{str(i)}.txt", frequency=[i, i])
+    a = oscillogram(path=f"{path}/{str(i)}")
     print(a)
     fx.append(abs(a.amplitude[1] / a.amplitude[0]))
     fx_error.append(
@@ -34,18 +22,37 @@ for i in fr:
         )
         ** 0.5
     )
+
     fch.append(a.phase_shift[0][1])
     fch_error.append(a.phase_shift_error[0][1])
-    x.append(sum(a.frequency) / 2)
-plt.title("АЧХ")
+
+    freq, error_freq = uneven_measurements(a.frequency, a.frequency_error)
+    x.append(freq)
+    x_error.append(error_freq)
+
+plt.title(r"$АЧХ$")
+plt.xlabel(r"Частота $\omega [c^-1]$")
+plt.ylabel(r"Коэффициент $K$")
 plt.errorbar(
-    list(map(lambda x: x * 2 * m.pi, x)), fx, yerr=fx_error, fmt="o", ecolor="red"
+    list(map(lambda x: x * 2 * m.pi, x)),
+    fx,
+    xerr=x_error,
+    yerr=fx_error,
+    fmt="o",
+    ecolor="red",
 )
 plt.grid()
 plt.show()
-plt.title("ФЧХ")
+plt.title(r"$ФЧХ$")
+plt.xlabel(r"Частота $ \omega [c^-1] $")
+plt.ylabel(r"Сдвиг фазы $\varphi [рад.]$")
 plt.errorbar(
-    list(map(lambda x: x * 2 * m.pi, x)), fch, yerr=fch_error, fmt="o", ecolor="red"
+    list(map(lambda x: x * 2 * m.pi, x)),
+    fch,
+    xerr=x_error,
+    yerr=fch_error,
+    fmt="o",
+    ecolor="red",
 )
 plt.grid()
 plt.show()
