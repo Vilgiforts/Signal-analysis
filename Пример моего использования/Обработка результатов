@@ -14,6 +14,7 @@ path = "Пример моего использования/RC 1"
 for i in os.listdir(path=path):
     a = oscillogram(path=f"{path}/{str(i)}")
     print(a)
+    a.ploter()
     fx.append(abs(a.amplitude[1] / a.amplitude[0]))
     fx_error.append(
         (
