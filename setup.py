@@ -1,7 +1,13 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="oscillogram",  # Укажите имя вашей библиотеки
+    name="oscillogram",
     version="0.1.0",
-    packages=find_packages(),  # Автоматически находит все пакеты
+    packages=find_packages(),
+    install_requires=[
+        "numpy",
+        "pandas",
+        "matplotlib",
+        "scipy",
+    ],
 )
