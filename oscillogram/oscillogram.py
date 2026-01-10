@@ -201,12 +201,14 @@ class oscillogram:
             list[list[tuple[float, float]]]: список в котором для каждого канала находятся списки кортежей с парами значений (время, значение).
         """
         rez = []
-        new_rez = []
         error_rez = []
+        uprox_rez = []
+        uprox_error_rez = []
         for i in range(self.channels):
             rez.append([])
-            new_rez.append([])
             error_rez.append([])
+            uprox_rez.append([])
+            uprox_error_rez.append([])
             flag = False
             max_value = max(abs(max(self.values[i])), abs(min(self.values[i])))
             if len(self.nulls[i]) >= 2:
@@ -221,6 +223,7 @@ class oscillogram:
                         singl *= -1
                         if flag and abs((actual_max_value[1]) / (max_value)) >= 0.7:
                             rez[i].append(actual_max_value)
+                            error_rez[i].append(self.delta_time[i])
                         actual_max_value = (0, self.values[i][j])
                         flag = True
             if len(self.nulls[i]) < 2:
@@ -232,18 +235,23 @@ class oscillogram:
                     rez[i].append(
                         (self.times[i][self.values[i].index(-max_value)], -max_value)
                     )
-            for j in range(len(rez[i])):
-                k = rez[i][j][0]
-                p = int(0.15 * len(self.times[i]) / len(self.nulls[i]))
-                idx = (max((k - p, 0)), min(k + p + 1, len(self.times[i]) - 1))
+                error_rez[i].append(self.delta_time[i])
+            if self.find_extrems_aprox_flag:
+                for j in range(len(rez[i])):
+                    k = rez[i][j][0]
+                    p = int(0.15 * len(self.times[i]) / len(self.nulls[i]))
+                    idx = (max((k - p, 0)), min(k + p + 1, len(self.times[i]) - 1))
 
-                value, error = error_extrems(
-                    self.times[i][idx[0] : idx[1]],
-                    self.values[i][idx[0] : idx[1]],
-                )
-                new_rez[i].append(value)
-                error_rez[i].append(error)
-        return new_rez, error_rez
+                    value, error = error_extrems(
+                        self.times[i][idx[0] : idx[1]],
+                        self.values[i][idx[0] : idx[1]],
+                    )
+                    uprox_rez[i].append(value)
+                    uprox_error_rez[i].append(error)
+        if self.find_extrems_aprox_flag:
+            return uprox_rez, uprox_error_rez
+        else:
+            return rez, error_rez
 
     def find_amplitude(self):
         rez = []
@@ -580,7 +588,7 @@ class oscillogram:
                     plt.plot(
                         [],
                         [],
-                        color=shifts_collor[j][i],
+                        color=shifts_collor[-i][-j],
                         label=f"Сдвиг фаз к.{i + 1}, к.{j + 1}: {self.phase_shift[i][j]:.2e}",
                     )
             try:
