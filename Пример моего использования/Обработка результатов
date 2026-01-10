@@ -26,6 +26,7 @@ for i in fr:
     except ZeroDivisionError:
         a = oscillogram(path=f"{path}{str(i)}.txt", frequency=[i, i])
     print(a)
+    a.ploter()
     fx.append(abs(a.amplitude[1] / a.amplitude[0]))
     fx_error.append(
         (
