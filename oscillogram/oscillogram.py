@@ -47,6 +47,7 @@ class oscillogram:
         absolute_error_x: int | float = 0,
         absolute_error_y: int | float = 0,
         confidence_probability: float = 0.95,
+        find_extrems_aprox_flag: bool = True,
     ):
         self.path = path  # Инициализируетм путь до файла
         dot_index = path.find(".")
@@ -59,6 +60,7 @@ class oscillogram:
         self.absolute_error_y = absolute_error_y
         self.confidence_probability = confidence_probability
         self.t_inf = sps.t.ppf(1 / 2 + confidence_probability / 2, df=10**6)
+        self.find_extrems_aprox_flag = find_extrems_aprox_flag
 
         # Начало чтения файла
         with open(path, "r") as file:  # Открываем файл
