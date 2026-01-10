@@ -183,7 +183,6 @@ class oscillogram:
             while j < len(rez[i]):
                 interim_nulls = []
                 k = j + 1
-                count = 0
                 while k < len(rez[i]) and abs(rez[i][j] - rez[i][k]) < max_distance / 4:
                     interim_nulls.append(rez[i][k])
                     k += 1
@@ -226,6 +225,55 @@ class oscillogram:
                             error_rez[i].append(self.delta_time[i])
                         actual_max_value = (0, self.values[i][j])
                         flag = True
+                try:
+                    ferst_extrems = []
+                    j = 1
+                    while (
+                        j < len(self.values[i]) - 1
+                        and self.times[i][j] < self.nulls[i][0]
+                    ):
+                        if (
+                            (
+                                self.values[i][j - 1] < self.values[i][j]
+                                and self.values[i][j] > self.values[i][j + 1]
+                            )
+                            or (
+                                self.values[i][j - 1] > self.values[i][j]
+                                and self.values[i][j] < self.values[i][j + 1]
+                            )
+                        ) and abs(self.values[i][j] / max_value) > 0.9:
+                            ferst_extrems.append((self.times[i][j], self.values[i][j]))
+                        j += 1
+                    rez[i].append(
+                        sorted(ferst_extrems, key=lambda x: abs(x[1]), reverse=True)[0]
+                    )
+                    error_rez[i].append(self.delta_time[i])
+
+                    last_extrems = []
+                    j = len(self.values[i])
+                    while (
+                        j < len(self.values[-1]) - 1
+                        and self.times[i][j] < self.nulls[i][0]
+                    ):
+                        if (
+                            (
+                                self.values[i][j - 1] < self.values[i][j]
+                                and self.values[i][j] > self.values[i][j + 1]
+                            )
+                            or (
+                                self.values[i][j - 1] > self.values[i][j]
+                                and self.values[i][j] < self.values[i][j + 1]
+                            )
+                        ) and abs(self.values[i][j] / max_value) > 0.9:
+                            last_extrems.append((self.times[i][j], self.values[i][j]))
+                        j -= 1
+                    rez[i].append(
+                        sorted(last_extrems, key=lambda x: abs(x[1]), reverse=True)[0]
+                    )
+                    error_rez[i].append(self.delta_time[i])
+                except Exception as e:
+                    pass
+
             if len(self.nulls[i]) < 2:
                 if abs(max(self.values[i])) > abs(min(self.values[i])):
                     rez[i].append(
@@ -335,7 +383,7 @@ class oscillogram:
                 frequency_error.append(freq_error)
                 print(
                     text_info(
-                        f"Частота {i}-того канала найдена как среднее между частотой найденой по экстремумам и по нулям сигнала."
+                        f"Частота {i + 1}-того канала найдена как среднее между частотой найденой по экстремумам и по нулям сигнала."
                     )
                 )
             elif flag_nulls:
