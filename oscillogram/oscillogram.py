@@ -258,12 +258,6 @@ class oscillogram:
         self.amplitude_error = []
         for i in range(self.channels):
             try:
-                # mean_value, eror = confidence_interval(
-                #     [abs(self.extrems[i][j][1]) for j in range(len(self.extrems[i]))],
-                #     relative_error=self.relative_erorr_y,
-                #     absolute_error=self.absolute_error_y,
-                #     confidence_probability=self.confidence_probability,
-                # )
                 mean_value, error = uneven_measurements(
                     [abs(self.extrems[i][j][1]) for j in range(len(self.extrems[i]))],
                     self.extrems_error[i],
@@ -276,9 +270,6 @@ class oscillogram:
                 self.amplitude_error.append(error)
                 rez.append(mean_value)
             except Exception as e:
-                # exc_type, exc_value, exc_traceback = sys.exc_info()
-
-                # Форматируем traceback в строку
                 error_message = traceback.format_exc()
                 print(
                     text_error(
@@ -545,7 +536,7 @@ class oscillogram:
         shifts_collor = tuple(
             tuple(
                 tuple(random.uniform(0.2, 0.5) for k in range(3))
-                for j in range(self.channels - i)
+                for j in range(self.channels)
             )
             for i in range(self.channels)
         )
@@ -588,7 +579,7 @@ class oscillogram:
                     plt.plot(
                         [],
                         [],
-                        color=shifts_collor[-i][-j],
+                        color=shifts_collor[j][i],
                         label=f"Сдвиг фаз к.{i + 1}, к.{j + 1}: {self.phase_shift[i][j]:.2e}",
                     )
             try:
