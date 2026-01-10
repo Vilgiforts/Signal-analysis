@@ -242,19 +242,22 @@ class oscillogram:
                                 and self.values[i][j] < self.values[i][j + 1]
                             )
                         ) and abs(self.values[i][j] / max_value) > 0.9:
-                            ferst_extrems.append((self.times[i][j], self.values[i][j]))
+                            ferst_extrems.append((j, self.values[i][j]))
                         j += 1
-                    rez[i].append(
-                        sorted(ferst_extrems, key=lambda x: abs(x[1]), reverse=True)[0]
-                    )
-                    error_rez[i].append(self.delta_time[i])
+                    try:
+                        rez[i].insert(
+                            0,
+                            sorted(
+                                ferst_extrems, key=lambda x: abs(x[1]), reverse=True
+                            )[0],
+                        )
+                        error_rez[i].insert(0, self.delta_time[i])
+                    except:
+                        pass
 
                     last_extrems = []
-                    j = len(self.values[i])
-                    while (
-                        j < len(self.values[-1]) - 1
-                        and self.times[i][j] < self.nulls[i][0]
-                    ):
+                    j = len(self.values[i]) - 2
+                    while j > 0 and self.times[i][j] > self.nulls[i][-1]:
                         if (
                             (
                                 self.values[i][j - 1] < self.values[i][j]
@@ -265,12 +268,18 @@ class oscillogram:
                                 and self.values[i][j] < self.values[i][j + 1]
                             )
                         ) and abs(self.values[i][j] / max_value) > 0.9:
-                            last_extrems.append((self.times[i][j], self.values[i][j]))
+                            last_extrems.append((j, self.values[i][j]))
                         j -= 1
-                    rez[i].append(
-                        sorted(last_extrems, key=lambda x: abs(x[1]), reverse=True)[0]
-                    )
-                    error_rez[i].append(self.delta_time[i])
+                    try:
+                        rez[i].append(
+                            sorted(last_extrems, key=lambda x: abs(x[1]), reverse=True)[
+                                0
+                            ]
+                        )
+                        error_rez[i].append(self.delta_time[i])
+                    except:
+                        pass
+
                 except Exception as e:
                     pass
 
@@ -288,7 +297,10 @@ class oscillogram:
                 for j in range(len(rez[i])):
                     k = rez[i][j][0]
                     p = int(0.15 * len(self.times[i]) / len(self.nulls[i]))
-                    idx = (max((k - p, 0)), min(k + p + 1, len(self.times[i]) - 1))
+                    idx = (
+                        int(max((k - p, 0))),
+                        int(min(k + p + 1, len(self.times[i]) - 1)),
+                    )
 
                     value, error = error_extrems(
                         self.times[i][idx[0] : idx[1]],
